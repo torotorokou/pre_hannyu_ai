@@ -1,0 +1,44 @@
+📂 管理業務:
+    - label: '📝 工場日報の作成'
+      page_key: 'manage_work'
+      function: 'manage_work_controller'
+
+    - label: '📋 工場搬出入収支表の作成'
+      page_key: 'manage_work'
+      function: 'manage_work_controller'
+
+    - label: '📋 集計項目平均表の作成'
+      page_key: 'manage_work'
+      function: 'manage_work_controller'
+
+    - label: '📋 ブロック単価表の作成'
+      page_key: 'manage_work'
+      function: 'manage_work_controller'
+
+    - label: '📋 管理票の作成'
+      page_key: 'manage_work'
+      function: 'manage_work_controller'
+
+🏭 工場管理:
+    - label: '📦 搬出入収支表の集計'
+      page_key: 'factory_manage'
+      function: 'factory_manage_work_controller'
+
+    - label: '📈 月間推移グラフ'
+      page_key: 'factory_manage'
+      function: 'factory_manage_work_controller'
+
+🧰 便利ツール:
+    - label: '🧮 重量計算ツール'
+      page_key: 'util'
+      function: 'render_util_page'
+
+    - label: '📆 日付変換ツール'
+      page_key: 'date_converter'
+
+🧾 その他:
+    - label: '📚 操作マニュアル'
+      page_key: 'manual'
+
+    - label: '📨 サポート連絡'
+      page_key: 'support'

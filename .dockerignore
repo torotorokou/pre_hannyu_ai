@@ -1,0 +1,10 @@
+# Exclude large / runtime mounted dirs
+notebooks/
+data/
+scripts/
+vendor/
+logs/
+__pycache__/
+*.pyc
+.git
+.gitignore
