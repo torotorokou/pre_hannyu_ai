@@ -55,6 +55,7 @@ def train_and_predict_stage1(
     df_pivot,
 ):
     results = {}
+    trained_models_dict = {}  # 学習済みモデルを保存
     X_train = df_past_feat[feature_list]
     for item in target_items:
         y_train = df_past_pivot[item]
@@ -79,10 +80,23 @@ def train_and_predict_stage1(
         pred = meta_model.predict(meta_input_target)[0]
 
         results[f"{item}_予測"] = pred
+        # 最初のアイテムのメタモデルを保存（特徴量重要度抽出用）
+        if len(trained_models_dict) == 0:
+            # メタモデルと共に前処理器を保存し、実際に使用された列インデックスを保持
+            trained_models_dict["meta_model"] = meta_model
+            trained_models_dict["raw_feature_names"] = feature_list  # フィルタ前
+            # VarianceThreshold は特定列を除外する可能性があるため mask を作成
+            vt_support = selector.get_support()
+            trained_models_dict["selector_support_mask"] = vt_support
+            trained_models_dict["scaler"] = scaler
+            trained_models_dict["selector"] = selector
+        
         true_val = df_pivot.loc[df_feat_today.index[0], item]
         stage1_eval[item]["y_true"].append(true_val)
         stage1_eval[item]["y_pred"].append(pred)
 
+    # 予測結果とモデル情報を両方返す
+    results["_models"] = trained_models_dict
     return results
 
 
@@ -124,7 +138,14 @@ def evaluate_stage1(stage1_eval, target_items):
 
 
 def full_walkforward(
-    df_raw, holidays, df_reserve, df_weather, min_stage1_days, min_stage2_days, top_n=5
+    df_raw,
+    holidays,
+    df_reserve,
+    df_weather,
+    min_stage1_days,
+    min_stage2_days,
+    top_n=5,
+    allowed_features=None,
 ):
     print("▶️ full_walkforward(new_model2) 開始")
     df_raw["伝票日付"] = pd.to_datetime(df_raw["伝票日付"])
@@ -136,10 +157,25 @@ def full_walkforward(
     df_reserve_feat_all = ReserveFeatureBuilder(df_reserve).build()
     df_weather_feat_all = df_weather.copy() if isinstance(df_weather, pd.DataFrame) else pd.DataFrame()
 
-    feature_list = get_feature_list(target_items, extra_features=["天気_晴れ", "天気_雨", "天気_大雨", "天気_台風"])
-    print(f"[DEBUG] feature_list_len={len(feature_list)} df_feat_rows={len(df_feat)}")
+    feature_list = get_feature_list(
+        target_items,
+        extra_features=["天気_晴れ", "天気_雨", "天気_大雨", "天気_台風"],
+    )
+    original_feature_list = feature_list.copy()
+    if allowed_features is not None:
+        # preserve order while filtering
+        feature_list = [f for f in feature_list if f in set(allowed_features)]
+        dropped = [f for f in original_feature_list if f not in feature_list]
+        if dropped:
+            print(f"[INFO] allowed_features 指定により {len(dropped)} 個の特徴量を除外: {dropped}")
+        if len(feature_list) == 0:
+            raise ValueError("allowed_features により使用可能な特徴量が0件になりました")
+    print(
+        f"[DEBUG] feature_list_len={len(feature_list)} (orig={len(original_feature_list)}) df_feat_rows={len(df_feat)}"
+    )
 
     all_actual, all_pred, all_stage1_rows = [], [], []
+    prediction_dates = []  # 実際に予測を行った日付を記録
     stage1_eval = {item: {"y_true": [], "y_pred": []} for item in target_items}
     dates = df_feat.index
     print(f"[DEBUG] dates_len={len(dates)} min_stage1_days={min_stage1_days} min_stage2_days={min_stage2_days}")
@@ -180,7 +216,6 @@ def full_walkforward(
             stage1_eval=stage1_eval,
             df_pivot=df_pivot,
         )
-
         row = {f"{item}_予測": stage1_result[f"{item}_予測"] for item in target_items}
         for col in df_feat_today.columns:
             if col not in row:
@@ -195,6 +230,7 @@ def full_walkforward(
             actual_val = df_pivot.loc[target_date, "合計"]
             all_actual.append(actual_val)
             all_pred.append(total_pred)
+            prediction_dates.append(target_date)  # 予測日付を記録
             if len(all_actual) >= 3:
                 r2_now = r2_score(all_actual, all_pred)
                 mae_now = mean_absolute_error(all_actual, all_pred)
@@ -207,4 +243,7 @@ def full_walkforward(
         print("評価できるデータが不足しています (all_actual=0)")
 
     evaluate_stage1(stage1_eval, target_items)
-    return all_actual, all_pred
+    
+    # 最後のモデルと日付リストを返す
+    last_model = stage1_result if 'stage1_result' in locals() else None
+    return all_actual, all_pred, last_model, prediction_dates
