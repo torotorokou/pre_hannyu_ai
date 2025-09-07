@@ -2,6 +2,9 @@ import pandas as pd
 import numpy as np
 import requests
 
+# 予約台数の列マッピングログを多重に出さないためのフラグ
+_RESERVE_MAPPING_LOGGED = False
+
 
 class WeatherFeatureBuilder:
     """Open-Meteo アーカイブ API から日次天気指標を取得し分類特徴量へ変換。
@@ -149,10 +152,53 @@ class ReserveFeatureBuilder:
         self.top_k_clients = top_k_clients
 
     def build(self):
+        global _RESERVE_MAPPING_LOGGED
+        # --- 日付列 正規化 ---
+        if "予約日" not in self.df_reserve.columns:
+            raise KeyError(f"予約日 列が存在しません: cols={list(self.df_reserve.columns)[:20]}")
         self.df_reserve["予約日"] = pd.to_datetime(self.df_reserve["予約日"])
+
+        # --- 予約台数 列 フォールバック対応 ---
+        if "予約台数" not in self.df_reserve.columns:
+            candidate_map = [
+                ("台数", "台数"),
+                ("予約_台数", "予約_台数"),
+                ("合計台数", "合計台数"),
+            ]
+            for src, label in candidate_map:
+                if src in self.df_reserve.columns:
+                    self.df_reserve["予約台数"] = self.df_reserve[src]
+                    if not _RESERVE_MAPPING_LOGGED:
+                        print(f"[ReserveFeatureBuilder] マッピング: {src} -> 予約台数")
+                        _RESERVE_MAPPING_LOGGED = True
+                    break
+        # パターンマッチによる自動検出 (上記で未決定の場合)
+        if "予約台数" not in self.df_reserve.columns:
+            pattern_candidates = [c for c in self.df_reserve.columns if "台" in c and len(c) <= 8]
+            if pattern_candidates:
+                chosen = sorted(pattern_candidates, key=len)[0]
+                self.df_reserve["予約台数"] = self.df_reserve[chosen]
+                if not _RESERVE_MAPPING_LOGGED:
+                    print(f"[ReserveFeatureBuilder] 自動検出: {chosen} -> 予約台数")
+                    _RESERVE_MAPPING_LOGGED = True
+        if "予約台数" not in self.df_reserve.columns:
+            # ここで止めることで上位セルで原因を即座に把握できる
+            raise KeyError(
+                "予約台数 列が見つかりません (期待: 予約台数 / 台数). 現在の列: "
+                + ",".join(list(self.df_reserve.columns)[:40])
+            )
+
         self.df_reserve["予約台数"] = pd.to_numeric(
             self.df_reserve["予約台数"], errors="coerce"
         ).fillna(0)
+
+        # --- 固定客 列 正規化 (bool/0-1 想定) ---
+        if "固定客" in self.df_reserve.columns:
+            if self.df_reserve["固定客"].dtype == object:
+                self.df_reserve["固定客"] = (
+                    self.df_reserve["固定客"].astype(str).str.contains("1|True|固定")
+                )
+            self.df_reserve["固定客"] = self.df_reserve["固定客"].astype(int)
 
         top_clients = (
             self.df_reserve["予約得意先名"]

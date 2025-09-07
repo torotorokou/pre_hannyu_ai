@@ -11,11 +11,25 @@ import logging
 from typing import Iterable, Optional, List
 
 LOGGER = logging.getLogger("new_model2.walkforward")
-# --- Logger setup (idempotent) ---
-if not any(isinstance(h, logging.StreamHandler) for h in LOGGER.handlers):
-    sh = logging.StreamHandler()
-    sh.setFormatter(logging.Formatter('[%(levelname)s] %(asctime)s %(name)s: %(message)s','%Y-%m-%d %H:%M:%S'))
-    LOGGER.addHandler(sh)
+def _ensure_single_stream_handler():
+    """Ensure only a single StreamHandler is attached (avoid duplicate lines in notebooks)."""
+    seen = set()
+    new_handlers = []
+    for h in LOGGER.handlers:
+        if isinstance(h, logging.StreamHandler):
+            key = (type(h), getattr(h, 'stream', None))
+            if key in seen:
+                continue  # drop duplicate
+            seen.add(key)
+        new_handlers.append(h)
+    if len(new_handlers) != len(LOGGER.handlers):
+        LOGGER.handlers = new_handlers
+    if not any(isinstance(h, logging.StreamHandler) for h in LOGGER.handlers):
+        sh = logging.StreamHandler()
+        sh.setFormatter(logging.Formatter('[%(levelname)s] %(asctime)s %(name)s: %(message)s','%Y-%m-%d %H:%M:%S'))
+        LOGGER.addHandler(sh)
+
+_ensure_single_stream_handler()
 
 def _attach_file_handler(log_dir: str = "data/cache", filename: str = "walkforward.log"):
     """Attach a rotating-like simple FileHandler if not already.
