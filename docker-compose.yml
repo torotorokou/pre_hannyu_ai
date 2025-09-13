@@ -2,10 +2,13 @@ services:
   ai-api:
     build: .
     container_name: ai-api
+    ports:
+      - "8000:8000"
     volumes:
       - ./works/notebooks:/works/notebooks
       - ./works/data:/works/data
       - ./works/scripts:/works/scripts
+      - ./api:/works/api
       - ./vendor:/works/vendor:ro
       - ./requirements.txt:/works/requirements.txt:ro
     environment:

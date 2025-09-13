@@ -26,5 +26,5 @@ RUN ln -s /works /work 2>/dev/null || true
 RUN apt-get update -y && apt-get install -y --no-install-recommends git
 USER app
 
-# FastAPI APIサーバー起動 (main.pyは後で作成)
-ENTRYPOINT ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+# FastAPI APIサーバー起動
+ENTRYPOINT ["uvicorn", "api.app_predict:app", "--host", "0.0.0.0", "--port", "8000"]
