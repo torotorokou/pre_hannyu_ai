@@ -10,8 +10,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /works
 
-# 依存関係をビルド時に固定インストール (提案B)
 COPY requirements.txt ./requirements.txt
+COPY main.py ./main.py
 RUN apt-get update -y && apt-get install -y --no-install-recommends gosu && rm -rf /var/lib/apt/lists/* \
     && pip install --no-cache-dir -U pip \
     && pip install --no-cache-dir -r requirements.txt
@@ -20,10 +20,11 @@ RUN apt-get update -y && apt-get install -y --no-install-recommends gosu && rm -
 RUN groupadd -g ${GROUP_ID} app && useradd -m -u ${USER_ID} -g app app \
     && chown -R app:app /works
 
+
 # /work 互換シンボリックリンク (既存コード対策)
 RUN ln -s /works /work 2>/dev/null || true
-
+RUN apt-get update -y && apt-get install -y --no-install-recommends git
 USER app
 
-# シンプルな待機 (VSCode attach 前提)。必要に応じて jupyter 起動をここに書き換える。
-ENTRYPOINT ["bash", "-c", "exec sleep infinity"]
+# FastAPI APIサーバー起動 (main.pyは後で作成)
+ENTRYPOINT ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]

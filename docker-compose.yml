@@ -1,16 +1,13 @@
 services:
-  ai-notebook:
+  ai-api:
     build: .
-    container_name: ai-notebook
+    container_name: ai-api
     volumes:
-      - ./notebooks:/works/notebooks
-      - ./data:/works/data
-      - ./scripts:/works/scripts
+      - ./works/notebooks:/works/notebooks
+      - ./works/data:/works/data
+      - ./works/scripts:/works/scripts
       - ./vendor:/works/vendor:ro
-      # Proposal A: requirements.txt をホスト変更時に即反映 (ビルドし直す想定でも差分レビューしやすいよう read-only)
       - ./requirements.txt:/works/requirements.txt:ro
     environment:
       - PYTHONPATH=/works:/works/vendor/app:/works/vendor/logic:/works/vendor/utils:/works/vendor/config
-    # Proposal C: ホストユーザー UID/GID で実行 (Dockerfile で app ユーザーを作成済み)
     user: "1000:1000"
-    # Jupyter は Dockerfile の ENTRYPOINT で起動
