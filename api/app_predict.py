@@ -99,6 +99,14 @@ from api_response import ApiResponse  # type: ignore  # noqa: E402
 # --- Config ---------------------------------------------------------------
 APP_TITLE = "Prediction API"
 APP_VERSION = "1.0.0"
+APP_DESCRIPTION = (
+    "予測モデルの推論API。\n\n"
+    "主なエンドポイント:\n"
+    "- GET /health: モデルロード状態の確認\n"
+    "- POST /predict: 指定日付の予測\n"
+    "- GET /predict/last: 直近日の予測\n\n"
+    "Swagger UI は /docs、OpenAPI JSON は /openapi.json、ReDoc は /redoc から参照できます。"
+)
 
 def _default_model_path(workspace_root: Path) -> str:
     p = (workspace_root / "data" / "final_stage1_model_api.pkl").resolve()
@@ -118,11 +126,31 @@ class PredictResult(BaseModel):
     total: float
     used_features: List[str]
 
+    # Pydantic v2: スキーマ例
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "date": "2025-09-13",
+                "per_item": {"ITEM_A": 123.4, "ITEM_B": 56.7},
+                "total": 180.1,
+                "used_features": ["weekday", "is_holiday", "lag_7d_sum"],
+            }
+        }
+    }
+
 
 class PredictRequest(BaseModel):
     """Request body for /predict."""
 
     date: _date = Field(..., description="Target date in YYYY-MM-DD")
+
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "date": "2025-09-13"
+            }
+        }
+    }
 
 
 # --- Provider: Loads the predictor (Single Responsibility) ----------------
@@ -213,7 +241,20 @@ def get_prediction_service() -> PredictionService:
 
 
 # --- App/Routes (Controller Layer) ----------------------------------------
-app = FastAPI(title=APP_TITLE, version=APP_VERSION)
+TAGS_METADATA = [
+    {"name": "health", "description": "ヘルスチェック（モデルロード状態）"},
+    {"name": "predict", "description": "予測エンドポイント群"},
+]
+
+app = FastAPI(
+    title=APP_TITLE,
+    version=APP_VERSION,
+    description=APP_DESCRIPTION,
+    openapi_tags=TAGS_METADATA,
+    docs_url=os.getenv("DOCS_URL", "/docs"),
+    redoc_url=os.getenv("REDOC_URL", "/redoc"),
+    openapi_url=os.getenv("OPENAPI_URL", "/openapi.json"),
+)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
@@ -228,7 +269,7 @@ def _startup_load_predictor() -> None:
     _provider_singleton.load()
 
 
-@app.get("/health", response_model=ApiResponse[None], summary="Health check")
+@app.get("/health", response_model=ApiResponse[None], summary="Health check", tags=["health"])
 def health(service: PredictionService = Depends(get_prediction_service)):
     """Health endpoint returning unified ApiResponse schema."""
     return service.health()
@@ -238,6 +279,7 @@ def health(service: PredictionService = Depends(get_prediction_service)):
     "/predict",
     response_model=ApiResponse[PredictResult],
     summary="Predict for a given date",
+    tags=["predict"],
 )
 def predict(
     payload: PredictRequest = Body(...),
@@ -251,6 +293,7 @@ def predict(
     "/predict/last",
     response_model=ApiResponse[PredictResult],
     summary="Predict for the latest available date",
+    tags=["predict"],
 )
 def predict_last(service: PredictionService = Depends(get_prediction_service)):
     """Predict for the latest date available in the model."""
@@ -266,3 +309,14 @@ if __name__ == "__main__":  # pragma: no cover
         port=int(os.getenv("PORT", "8000")),
         reload=bool(int(os.getenv("UVICORN_RELOAD", "0"))),
     )
+
+# 便利リンク（任意）
+@app.get("/", summary="Service root")
+def root():
+    return {
+        "service": APP_TITLE,
+        "version": APP_VERSION,
+        "docs": "/docs",
+        "openapi": "/openapi.json",
+        "redoc": "/redoc",
+    }
