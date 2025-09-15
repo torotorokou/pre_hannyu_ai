@@ -22,8 +22,100 @@ from pathlib import Path
 from typing import Dict, List
 
 from fastapi import Body, Depends, FastAPI
+from fastapi import HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
+import calendar
+import jpholiday
+# --- Result/Request Models (OpenAPI schema) -------------------------------
+class PreprocessFeaturesRequest(BaseModel):
+    date: _date = Field(..., description="Target date in YYYY-MM-DD")
+    yoyaku_count: int = Field(..., description="予約件数")
+    yoyaku_total: int = Field(..., description="予約合計台数")
+    fixed_customer_count: int = Field(..., description="固定客予約数")
+    top_customer_count: int = Field(..., description="上位得意先予約数")
+
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "date": "2025-09-15",
+                "yoyaku_count": 12,
+                "yoyaku_total": 20,
+                "fixed_customer_count": 3,
+                "top_customer_count": 5
+            }
+        }
+    }
+
+class PreprocessFeaturesResult(BaseModel):
+    date: str
+    features: Dict[str, float]
+
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "date": "2025-09-15",
+                "features": {
+                    "曜日": 1,
+                    "週番号": 37,
+                    "祝日フラグ": 0,
+                    "予約件数": 12,
+                    "予約合計台数": 20,
+                    "固定客予約数": 3,
+                    "上位得意先予約数": 5,
+                    "天気_晴れ": 1,
+                    "天気_雨": 0,
+                    "天気_大雨": 0,
+                    "天気_台風": 0
+                }
+            }
+        }
+    }
+# --- App/Routes (Controller Layer) ----------------------------------------
+@app.post(
+    "/preprocess/features",
+    response_model=ApiResponse[PreprocessFeaturesResult],
+    summary="日付＋予約情報から特徴量ベクトルを自動生成",
+    tags=["predict"],
+)
+def preprocess_features(
+    payload: PreprocessFeaturesRequest = Body(...),
+):
+    """日付＋予約情報から特徴量ベクトルを自動生成して返すAPI"""
+    # 特徴量リスト取得
+    sel_path = _WS_ROOT / "data" / "selected_features_final.txt"
+    if not sel_path.exists():
+        raise HTTPException(status_code=500, detail="selected_features_final.txt not found")
+    with open(sel_path, encoding="utf-8") as f:
+        features_list = [ln.strip() for ln in f if ln.strip()]
+
+    # 日付情報
+    dt = payload.date
+    weekday = dt.weekday()  # 0=月, 6=日
+    weeknum = dt.isocalendar()[1]
+    is_holiday = int(jpholiday.is_holiday(dt) or weekday >= 5)
+
+    # 天気はダミー（晴れのみ1, 他0）
+    weather_keys = [k for k in features_list if k.startswith("天気_")]
+    weather = {k: (1 if k == "天気_晴れ" else 0) for k in weather_keys}
+
+    # 特徴量ベクトル生成
+    feats = {}
+    for k in features_list:
+        if k == "曜日": feats[k] = float(weekday)
+        elif k == "週番号": feats[k] = float(weeknum)
+        elif k == "祝日フラグ": feats[k] = float(is_holiday)
+        elif k == "予約件数": feats[k] = float(payload.yoyaku_count)
+        elif k == "予約合計台数": feats[k] = float(payload.yoyaku_total)
+        elif k == "固定客予約数": feats[k] = float(payload.fixed_customer_count)
+        elif k == "上位得意先予約数": feats[k] = float(payload.top_customer_count)
+        elif k in weather:
+            feats[k] = float(weather[k])
+        else:
+            feats[k] = 0.0
+
+    result = PreprocessFeaturesResult(date=dt.isoformat(), features=feats)
+    return ApiResponse.success(code="PREPROCESS_OK", detail="特徴量生成完了", result=result)
 
 
 # --- Workspace/Path detection --------------------------------------------
