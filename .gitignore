@@ -1,47 +1,12 @@
-# Python
-__pycache__/
-*.py[cod]
-*.pyo
-*.pyd
-*.pyc
-venv/
-env/
-.venv/
-.python-version
-pip-wheel-metadata/
-*.egg-info/
-dist/
-build/
+# すべて除外
+*
 
-# Jupyter
-.ipynb_checkpoints/
-
-# VS Code
-.vscode/
-
-# Logs and local data
-logs/
-*.log
-
-# Streamlit
-.streamlit/
-
-# OS files
-.DS_Store
-Thumbs.db
-
-# Docker
-docker-compose.override.yml
-
-# Test & cache
-.pytest_cache/
-.mypy_cache/
-.cache/
-
-# Data (often large/binary; keep out of repo)
-data/
-
-# Temporary files
-*.swp
-*.swo
-~*
+# 追跡したいものだけ除外解除
+!/move/
+!/move/**
+!/Dockerfile
+!/Dockerfile.api
+!/docker-compose.yml
+!/requirements.txt
+!/.gitignore
+!/README.md

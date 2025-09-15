@@ -1,0 +1,12 @@
+# Core API dependencies
+fastapi
+uvicorn
+pydantic
+
+# ML & Data processing
+scikit-learn
+pandas
+numpy
+
+# Optional for date calculations in predictor
+jpholiday
