@@ -1,16 +1,31 @@
 services:
+  # Jupyter開発環境用
+  ai-jupyter:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ai-jupyter
+    ports:
+      - "8888:8888"
+    volumes:
+      - ./move:/works
+    environment:
+      - PYTHONPATH=/works
+      - MODE=jupyter
+    profiles:
+      - jupyter
+
+  # API本番環境用
   ai-api:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile.api
     container_name: ai-api
     ports:
       - "8000:8000"
     volumes:
-      - ./works/notebooks:/works/notebooks
-      - ./works/data:/works/data
-      - ./works/scripts:/works/scripts
-      - ./api:/works/api
-      - ./vendor:/works/vendor:ro
-      - ./requirements.txt:/works/requirements.txt:ro
+      - ./move:/works
     environment:
-      - PYTHONPATH=/works:/works/vendor/app:/works/vendor/logic:/works/vendor/utils:/works/vendor/config
-    user: "1000:1000"
+      - PYTHONPATH=/works
+    profiles:
+      - api

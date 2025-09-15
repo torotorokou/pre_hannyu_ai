@@ -3,18 +3,18 @@ FROM python:3.10-slim
 
 WORKDIR /works
 
-COPY requirements.txt ./requirements.txt
+COPY move/requirements.txt ./requirements.txt
 RUN apt-get update -y && apt-get install -y --no-install-recommends git \
  && rm -rf /var/lib/apt/lists/*
 RUN pip install --no-cache-dir -U pip \
  && pip install --no-cache-dir -r requirements.txt
 
-COPY . .
+COPY move ./
 
 # 環境変数（必要に応じて切り替え可能）
 ENV WORKSPACE_ROOT=/works
-ENV PREDICTOR_MODEL_PATH=/works/works/data/final_stage1_model_api.pkl
+ENV PREDICTOR_MODEL_PATH=/works/data/final_stage1_model_api.pkl
 
 EXPOSE 8000
 
-CMD ["uvicorn", "works.api.app_predict:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "api.app_predict:app", "--host", "0.0.0.0", "--port", "8000"]
