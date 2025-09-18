@@ -10,3 +10,4 @@ numpy
 
 # Optional for date calculations in predictor
 jpholiday
+requests

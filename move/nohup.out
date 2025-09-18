@@ -1,0 +1,13 @@
+nohup: ignoring input
+INFO:     Started server process [87266]
+INFO:     Waiting for application startup.
+[STARTUP] モデルロード開始...
+[DEBUG] Checking model path: /works/move/data/final_stage1_model_api.pkl
+[DEBUG] Path exists: True
+[DEBUG] Current working directory: /works/move
+[DEBUG] WS_ROOT: /works
+[STARTUP] モデルロード成功
+INFO:     Application startup complete.
+ERROR:    [Errno 98] error while attempting to bind on address ('0.0.0.0', 8003): address already in use
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.

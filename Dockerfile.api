@@ -17,4 +17,4 @@ ENV PREDICTOR_MODEL_PATH=/works/data/final_stage1_model_api.pkl
 
 EXPOSE 8000
 
-CMD ["uvicorn", "api.app_predict:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "api.app_predict_simple:app", "--host", "0.0.0.0", "--port", "8000"]
