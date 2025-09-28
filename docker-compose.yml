@@ -6,7 +6,7 @@ services:
       - ./notebooks:/works/notebooks
       - ./data:/works/data
       - ./scripts:/works/scripts
-      - ./vendor:/works/vendor:ro
+      - ./vendor:/works/vendor
     environment:
       - PYTHONPATH=/works:/works/vendor/app:/works/vendor/logic:/works/vendor/utils:/works/vendor/config
     # Jupyter は Dockerfile の ENTRYPOINT で起動
