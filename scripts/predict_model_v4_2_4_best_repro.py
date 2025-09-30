@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
 """
 predict_model_v4_2_4_best_repro.py
- - 未来リーク無しの残差バイアス補正(曜日×直近W日median)
+ - 未来リーク無しの残差バイアス補正(曜日×直近W日median/quantile)
  - 52週サイクル(woy_sin/cos)をexogへ追加
+ - 日付の(曜日)除去・NFKC正規化・数値カンマ除去など前処理を強化（スケールずれ防止）
  - ★API化向け: モデル保存(Servingバンドル: Stage1パック+Stage2モデル+直近履歴)を追加
 
 保存物(model_bundle.joblib):
@@ -125,7 +126,7 @@ def _read_csv(path: Optional[str]) -> Optional[pd.DataFrame]:
 def _clean_date_string(x: str) -> str:
     if x is None or (isinstance(x, float) and np.isnan(x)): return ""
     s = str(x)
-    s = re.sub(r"[\(（][^\)）]*[\)）]", "", s)
+    s = re.sub(r"[\(（][^\)）]*[\)）]", "", s)   # (月) 等削除
     s = s.replace("年","/").replace("月","/").replace("日","")
     s = s.replace("-", "/")
     return s.strip()
@@ -177,7 +178,13 @@ def preprocess_raw(df: pd.DataFrame, date_col: str, item_col: str, weight_col: s
     dd = df[[cmap["date"], cmap["item"], cmap["weight"]]].copy()
     dd.columns = ["__date__", "__item__", "__weight__"]
     dd["__date__"] = _parse_date_series(dd["__date__"])
-    dd["__weight__"] = pd.to_numeric(dd["__weight__"].str.replace(",", "", regex=False), errors="coerce")
+    # 数値カンマ・全角の混入に備え、文字列化→カンマ除去→数値化
+    dd["__weight__"] = (
+        dd["__weight__"].astype(str)
+        .str.replace(",", "", regex=False)
+        .str.replace("\u3000", "", regex=False)
+    )
+    dd["__weight__"] = pd.to_numeric(dd["__weight__"], errors="coerce")
     dd = dd.dropna(subset=["__date__", "__weight__"])
     if len(dd) == 0:
         _emit_preprocess_diagnostics(df, date_col, item_col, weight_col, out_dir, stage="raw->clean")
@@ -199,7 +206,7 @@ def _emit_preprocess_diagnostics(df: pd.DataFrame, date_col: str, item_col: str,
         }
         with open(path, "w", encoding="utf-8") as f:
             json.dump(diag, f, ensure_ascii=False, indent=2)
-        print(f"[DIAG] 前処理診断を書き出しました: {path}")
+        print(f="[DIAG] 前処理診断を書き出しました: {path}")
     except Exception as e:
         print(f"[WARN] 診断書き出しに失敗: {e}")
 
@@ -236,7 +243,7 @@ def preprocess_reserve(df: Optional[pd.DataFrame], date_col: str, count_col: str
         raise ValueError("予約データの日付列が見つかりません。")
     dd[cmap["date"]] = _parse_date_series(dd[cmap["date"]])
     if cmap["count"] in dd.columns:
-        dd[cmap["count"]] = pd.to_numeric(dd[cmap["count"]].str.replace(",","",regex=False), errors="coerce")
+        dd[cmap["count"]] = pd.to_numeric(dd[cmap["count"]].astype(str).str.replace(",","",regex=False), errors="coerce")
     if cmap["fixed"] in dd.columns:
         dd[cmap["fixed"]] = dd[cmap["fixed"]].astype(str).str.lower().isin(["1","true","yes","固定","固定客"]).astype(int)
     grp = dd.groupby(cmap["date"])
@@ -421,6 +428,10 @@ def make_stage2_matrix(df_in: pd.DataFrame, target_items: List[str], cfg: Config
     X = df_in.drop(columns=[c for c in ["合計"] if c in df_in.columns]).copy()
     if cfg.add_dow_item_interactions:
         X = _add_dow_item_interactions(X, cols_pred)
+    # datetime 型の列を除去（astype(float)前に必須）
+    dt_cols = list(X.select_dtypes(include=["datetime", "datetimetz", "datetime64[ns]"]).columns)
+    if dt_cols:
+        X = X.drop(columns=dt_cols)
     feature_names = list(X.columns)
     return X.astype(float), feature_names
 
@@ -458,7 +469,7 @@ def predict_total(models: Dict, x_today_raw: pd.DataFrame) -> Tuple[float,float,
     return p50, p90, mean
 
 # =========================
-# 残差バイアス補正 (曜日×直近W日 median)
+# 残差バイアス補正 (曜日×直近W日 median/quantile)
 # =========================
 def _resid_bias_adjustment(pred_day: pd.Timestamp,
                            hist_df: pd.DataFrame,
@@ -574,7 +585,7 @@ def run_walkforward(df_raw: pd.DataFrame,
         row = {f"{it}_pred": per_item_pred[it] for it in target_items}
         for c in today_feats.columns: row[c] = float(today_feats.iloc[0][c])
         row["合計"] = float(total.loc[pred_day])
-        row["__date__"] = pd.Timestamp(pred_day)  # ← 保存用
+        row["__date__"] = pd.Timestamp(pred_day)  # 保存用
         stage2_rows.append(row)
 
         # ウォームアップ
