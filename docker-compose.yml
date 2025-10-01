@@ -10,3 +10,21 @@ services:
     environment:
       - PYTHONPATH=/works:/works/vendor/app:/works/vendor/logic:/works/vendor/utils:/works/vendor/config
     # Jupyter は Dockerfile の ENTRYPOINT で起動
+  predict-api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    container_name: predict-api
+    environment:
+      - MODEL_BUNDLE_PATH=/works/models/model_bundle.joblib
+      - API_PORT=8080
+      - API_RELOAD=true
+    volumes:
+      - ./vendor:/works/vendor:ro
+      - ./scripts:/works/scripts:ro
+      - ./models:/works/models
+      - ./data:/works/data:ro
+      - ./api:/works/api
+    ports:
+      - "8080:8080"
+    restart: unless-stopped

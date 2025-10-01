@@ -1,8 +1,9 @@
 # Exclude large / runtime mounted dirs
 notebooks/
 data/
-scripts/
-vendor/
+# scripts と vendor は API イメージで COPY したいので除外しない
+# scripts/
+# vendor/
 logs/
 __pycache__/
 *.pyc
