@@ -1,0 +1,40 @@
+FROM python:3.10-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PYTHONPATH=/works:/works/vendor/app:/works/vendor/logic:/works/vendor/utils:/works/vendor/config
+
+# 非rootユーザー作成（本番想定）
+RUN useradd -m appuser
+
+WORKDIR /works
+
+COPY requirements.txt ./requirements.txt
+RUN set -e; \
+    apt-get update && apt-get install -y --no-install-recommends build-essential git && rm -rf /var/lib/apt/lists/*; \
+    pip install --upgrade pip >/dev/null 2>&1 || true; \
+    pip install -r requirements.txt; \
+    # LightGBM の system library (g++ は build-essentialで供給) \
+    true
+
+# モデル / スクリプト / アプリコードをコピー（必要に応じて最小化）
+COPY scripts ./scripts
+COPY vendor ./vendor
+COPY api ./api
+
+# 書き込み領域（推論ログや一時ファイル用）
+RUN mkdir -p /works/models /works/data /works/tmp && chown -R appuser:appuser /works && chmod -R 775 /works
+
+USER appuser
+
+EXPOSE 8080
+
+# 環境変数でモデルパスを差し替え可能に
+ENV MODEL_BUNDLE_PATH=/works/models/model_bundle.joblib \
+    API_HOST=0.0.0.0 \
+    API_PORT=8080 \
+    API_RELOAD=false
+
+# uvicorn 起動スクリプト
+ENTRYPOINT ["bash", "-c", "uvicorn api.main:app --host ${API_HOST:-0.0.0.0} --port ${API_PORT:-8080} $( [ \"$API_RELOAD\" = \"true\" ] && echo --reload )"]

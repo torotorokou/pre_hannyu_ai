@@ -1,0 +1,54 @@
+# requirements.in - 上流（緩めのバージョン範囲）依存定義
+# pip-compile (pip-tools) などで requirements.txt を再生成することを想定
+# 目的: 1) API/学習共通コアは互換範囲指定 2) セキュリティ/再現が必要なときは lock (requirements.txt) を固定
+
+############################
+# Core data / ML
+############################
+pandas>=1.5,<3.0
+numpy>=1.24,<3.0
+scikit-learn>=1.3,<1.7
+joblib>=1.3,<2.0
+
+############################
+# Feature / domain libs
+############################
+jpholiday>=1.0,<2.0
+SQLAlchemy>=2.0,<2.1
+pyyaml>=6.0,<7.0
+requests>=2.31,<3.0
+matplotlib>=3.7,<3.11
+Pillow>=10.0,<12.0
+
+############################
+# API / Serving
+############################
+fastapi>=0.110,<0.116
+uvicorn[standard]>=0.29,<0.31
+pydantic>=2.6,<3.0
+
+############################
+# Ensemble / advanced models (optional)
+############################
+lightgbm>=4.0,<5.0
+xgboost>=2.0,<3.0
+catboost>=1.2,<1.4
+
+############################
+# Dev / notebook (開発専用。デプロイ用イメージから除外したい場合は別ファイルへ分離)
+############################
+ipython>=8.0,<9.0
+jupyterlab>=4.0,<5.0
+
+############################
+# (任意高速JSON)
+############################
+# orjson>=3.9,<4.0
+
+# --- メモ ---
+# 1. このファイルは "許容するバージョン範囲" を記述
+# 2. 本番デプロイは pip-compile により生成された requirements.txt (完全 pin) を使用
+# 3. ライブラリアップデート手順例:
+#    pip install pip-tools
+#    pip-compile --generate-hashes --output-file requirements.txt requirements.in
+# 4. 破壊的変更を避けるため、< で次メジャーをブロック

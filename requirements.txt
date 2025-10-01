@@ -12,3 +12,18 @@ requests
 # Notebook
 ipython>=8.0
 jupyterlab
+
+# ==== API / Serving ====
+fastapi==0.115.0
+uvicorn[standard]==0.30.1
+pydantic==2.9.2
+joblib>=1.4.2
+
+# ==== 追加モデル (スタッキング/アンサンブルで利用) ====
+lightgbm
+xgboost
+catboost
+
+# ==== （必要に応じて）推論高速化 / オプション ====
+# orjson  # 高速JSON (FastAPIで使用するならコメント解除)
+# numpy==2.2.6 は上で指定済み
